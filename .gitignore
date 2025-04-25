@@ -1,0 +1,14 @@
+# created by virtualenv automatically
+# ignore venv folders
+venv/
+env/
+
+# ignore python cache
+__pycache__/
+
+# ignore data files
+*.parquet
+*.csv
+
+# ignore os files
+.DS_Store
