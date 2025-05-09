@@ -1,74 +1,136 @@
 # Entity Resolution
 
-This project solves the Entity Resolution challenge by identifying and clustering company records that refer to the same real-world entity, even if their names or addresses vary.
+This project tackles the Entity Resolution challenge by identifying and clustering company records that refer to the same real-world entity, even when attributes such as names, addresses, or contact details vary significantly.
 
-## Strategy
-- blocking (grouping similar records together)
-- scoring (comparing how similar they are)
-- clustering (grouping records referring to the same entity)
+The goal is to design a scalable, adaptable solution specifically tailored to company datasets, which often suffer from inconsistent formatting, language variations, and incomplete data.
+
+## Problem Understanding & Approach
+Real-world company data is messy: names can have suffixes (LLC, SRL), locations are expressed in different ways, and websites/phones may be missing or incorrect. This solution takes a deterministic but flexible approach combining:
+
+Blocking to reduce the number of comparisons
+
+Fuzzy Matching to identify similar entities within blocks
+
+Graph-Based Clustering to group matching entities
 
 
-1. **Blocking**:  
-   - To reduce the number of comparisons, companies are grouped into "blocks" using a combination of normalized company names and location information (e.g., city, country).
-   - This drastically reduces the number of comparisons from millions to manageable subsets.
+## Feature Selection & Preprocessing
+To ensure relevance and data quality, the following preprocessing steps were applied:
 
-2. **Matching**:  
-   - Inside each block, company names are compared using fuzzy string matching (`fuzz.token_set_ratio`) to determine their similarity.
-   - Matches with a similarity score above a defined threshold (e.g. 90%) are considered duplicates.
+Normalized Names: Lowercased strings, removed accents and punctuation, stripped legal suffixes (Kft, GmbH, LLC, etc.)
 
-3. **Clustering**:  
-   - A graph-based approach is used to group similar companies into clusters.
-   - Each node is a company, and edges connect companies with strong similarity. Connected components form the final clusters.
+Locations: Used a combination of city and country as blocking attributes
 
-## Tech Stack
+Data Cleaning: Removed empty rows, normalized Unicode characters, and eliminated noise tokens (e.g., "online only", "--")
 
-- **Python 3.12**
-- **Pandas** – for data manipulation
-- **FuzzyWuzzy** – for fuzzy string similarity
-- **re** - for text cleaning
-- **itertools.combinations** - for generating pairs
-- **UnionFind** - for clustering
-- **PyCharm** – for development and testing
+Attributes considered but not used due to incompleteness or noise: email, phone number, and website.
 
-## Sample Results
+## Blocking Strategy
+To make pairwise comparisons tractable (from millions of rows), companies were grouped into blocks based on:
 
-Here are some of the actual clusters found:
+Cleaned name prefixes
 
-### Cluster ID: 29462 (Tescoma)
-- tescoma  
-- tescoma budaörs  
-- tescoma corvin  
-- tescoma kft  
-- tescoma (multiple Budapest addresses)
+City + Country
 
-### Cluster ID: 33198 (AAA Auto)
-- aaa auto otrokovice zlín  
-- aaa auto zličín  
-- aaa auto ostrava  
-- aaa auto praha čestlice  
-- aaa auto teplice  
-- aaa auto jihlava  
-- aaa auto brno  
-- aaa auto online prodej  
-*(and many more city variants)*
 
-### Cluster ID: 30746 (Dental Planet)
-- dental planet manukau  
-- dental planet mt roskill  
-- dental planet howick  
-- dental planet limited  
+## Matching Logic
+Within each block, companies were compared using:
+
+FuzzyWuzzy’s token_set_ratio to compute name similarity
+
+A threshold of 90% was chosen empirically to balance precision and recall
+Example:
+"Tescoma Budaörs" ↔ "Tescoma Kft" → Similarity Score: 92 → Match
+
+## Clustering Logic
+A Union-Find (Disjoint Set) data structure was used to build clusters:
+
+Each company is a node
+
+Edges are added between matching pairs
+
+Connected components form a cluster
+
+
+## Sample Clusters
+Cluster ID: 29462 – Tescoma
+
+- tescoma
+- tescoma budaörs
+- tescoma corvin
+- tescoma kft
+
+Cluster ID: 33198 – AAA Auto
+
+- aaa auto otrokovice zlín 
+- aaa auto ostrava 
+- aaa auto jihlava 
+- aaa auto praha čestlice
+
+Cluster ID: 30746 – Dental Planet
+
+- dental planet howick 
+- dental planet limited 
+- dental planet mt roskill
+
 
 ## Output
+Final clusters are saved in: entity_resolution_clustered.csv
 
-The final clustered results are saved in:
+Each record includes:
 
-entity_resolution_clustered.csv
+cluster_id (companies in the same group share a cluster)
 
-where companies with the same cluster_id are likely the same and -1 means no match was found
+-1 for unclustered records (no matches found)
 
-## Summary
-1. Cleans the data - standardizez strings (lowercase, remove punctuation)
-2. Creates blocking keys - limits comparisons to likely matches only
-3. Fuzzy matches within blocks - scores all possible pairs
-4. Clusters matches - groups records that are similar enough using a union-find structure
-5. Assigns a cluster_id - every record gets a cluster_id to indicate which group it belongs to
+
+## Strengths & Limitations
+### Strengths
+Fast and scalable through blocking
+
+Deterministic and interpretable logic
+
+Works well for moderately clean data with consistent name/location info
+
+### Limitations
+Weak performance on online-only or incomplete records
+
+Struggles with deep name variations or translations
+
+No ML used — not adaptive to subtle signals across attributes
+
+
+## Scalability Considerations
+Blocking ensures sub-linear scaling with input size
+
+Pairwise fuzzy matching can be parallelized by block
+
+Future improvements may include LSH (Locality Sensitive Hashing) for faster approximate matching
+
+
+## Future Work
+Geocoding support: Normalize addresses by coordinates for better location grouping
+
+ML-based scoring: Learn match probabilities from labeled data
+
+Rule engine: Add rules like "same domain = likely match"
+
+Active learning loop: Include manual review and feedback integration
+
+
+## Tech Stack
+Python 3.12
+
+- pandas – data wrangling 
+- fuzzywuzzy – string similarity 
+- re, itertools, collections – core Python for preprocessing & logic 
+- UnionFind – custom class for clustering
+
+Developed in PyCharm
+
+## Reflections
+This project helped me understand:
+
+- The complexity of real-world deduplication tasks
+- How to design for performance using blocking 
+- The importance of balancing simplicity, interpretability, and accuracy
